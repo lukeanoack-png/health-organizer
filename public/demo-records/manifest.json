@@ -1,0 +1,14 @@
+{
+  "description": "PLACEHOLDER SYNTHETIC dataset. Replace these files with the final synthetic records. Every file must be fictional and should carry a SYNTHETIC marker.",
+  "files": [
+    "01_SYNTHETIC_primary-care_2026-01-15.txt",
+    "02_SYNTHETIC_lab-report_2026-01-15.csv",
+    "03_SYNTHETIC_primary-care_2026-03-04.txt",
+    "04_SYNTHETIC_cardiology-consult_2026-03-12.txt",
+    "05_SYNTHETIC_imaging-echo_2026-03-20.txt",
+    "06_SYNTHETIC_discharge-summary_2026-04-02.txt",
+    "07_SYNTHETIC_lab-report_2026-04-10.csv",
+    "08_SYNTHETIC_primary-care_2026-04-15.txt",
+    "09_SYNTHETIC_pharmacy-medication-list_2026-04-20.csv"
+  ]
+}

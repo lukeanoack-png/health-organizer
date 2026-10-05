@@ -1,0 +1,34 @@
+{
+  "name": "health-organizer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Educational prototype: organizes SYNTHETIC health records with provenance and conflict surfacing. Not for clinical use.",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "dump": "tsx scripts/dump-demo.ts",
+    "ask": "tsx scripts/ask-demo.ts"
+  },
+  "dependencies": {
+    "next": "16.3.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "unpdf": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.4",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}

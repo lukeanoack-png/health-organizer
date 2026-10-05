@@ -1,0 +1,37 @@
+SYNTHETIC — NOT A REAL PATIENT
+Document Type: Cardiology Consultation
+Facility: Riverbend Cardiology Associates (fictional)
+Provider: Thomas Okafor, MD (fictional)
+Date of Service: 2026-03-12
+Patient: Dana R. Whitfield (fictional)
+DOB: 04/17/1968
+Sex: Female
+
+REASON FOR CONSULTATION:
+Palpitations, referred by primary care.
+
+PAST MEDICAL HISTORY:
+- Hypertension
+- Prediabetes
+- Hyperlipidemia
+
+CURRENT MEDICATIONS:
+- Lisinopril 20 mg daily
+- Metformin 500 mg twice daily
+- Atorvastatin 20 mg nightly
+- Aspirin 81 mg daily
+
+ALLERGIES:
+- NKDA
+
+RECENT LABS:
+- LDL cholesterol 126 mg/dL (01/15/2026)
+- Hemoglobin A1c 7.4 % (01/15/2026)
+
+ASSESSMENT:
+Intermittent palpitations. Electrocardiogram today shows sinus rhythm.
+
+PLAN:
+- Transthoracic echocardiogram ordered.
+- Start metoprolol succinate 25 mg daily.
+- 14-day ambulatory rhythm monitor.

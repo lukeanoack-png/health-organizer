@@ -1,0 +1,13 @@
+# SYNTHETIC — NOT A REAL PATIENT
+# Document Type: Laboratory Report
+# Laboratory: Northfield Diagnostic Laboratory (fictional)
+# Ordering Provider: Priya Natarajan, MD (fictional)
+# Patient: Dana R. Whitfield (fictional)
+# DOB: 07/14/1968
+# Collection Date: 2026-04-10
+# Report Date: 2026-04-10
+test,result,units,reference_range,flag,collected
+Hemoglobin A1c,7.1,%,4.0-5.6,H,2026-04-10
+Potassium,4.1,mmol/L,3.5-5.1,,2026-04-10
+Creatinine,0.9,mg/dL,0.6-1.1,,2026-04-10
+eGFR,78,mL/min/1.73m2,>60,,2026-04-10

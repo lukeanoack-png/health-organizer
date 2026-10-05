@@ -1,0 +1,13 @@
+# SYNTHETIC — NOT A REAL PATIENT
+# Document Type: Pharmacy Medication List
+# Pharmacy: Cedar Street Pharmacy (fictional)
+# Pharmacist: Ana Lindqvist, PharmD (fictional)
+# Patient: Dana R. Whitfield (fictional)
+# DOB: 07/14/1968
+# List Date: 2026-04-20
+medication,dose,frequency,status,last_filled
+Apixaban,5 mg,twice daily,active,2026-04-02
+Metoprolol succinate,50 mg,daily,active,2026-04-02
+Lisinopril,20 mg,daily,active,2026-04-02
+Metformin,500 mg,twice daily,active,2026-03-28
+Atorvastatin,20 mg,nightly,discontinued,2026-02-20

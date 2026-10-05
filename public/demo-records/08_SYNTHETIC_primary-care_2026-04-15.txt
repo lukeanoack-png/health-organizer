@@ -1,0 +1,34 @@
+SYNTHETIC — NOT A REAL PATIENT
+Document Type: Primary Care Office Visit — Post-hospital Follow-up
+Facility: Maple Grove Family Medicine (fictional)
+Provider: Priya Natarajan, MD (fictional)
+Date of Service: 2026-04-15
+Patient: Dana R. Whitfield (fictional)
+DOB: 07/14/1968
+Sex: Female
+
+HISTORY OF PRESENT ILLNESS:
+Seen after hospitalization at Lakeside Regional. Feeling better. No palpitations since discharge.
+
+PAST MEDICAL HISTORY:
+- Hypertension
+- Type 2 diabetes mellitus
+- Hyperlipidemia
+- No history of atrial fibrillation
+
+CURRENT MEDICATIONS:
+- Lisinopril 10 mg once daily
+- Metformin 500 mg twice daily
+- Atorvastatin 20 mg nightly
+- Metoprolol succinate 50 mg daily
+- Apixaban 5 mg twice daily
+
+ALLERGIES:
+- Penicillin (hives)
+
+RESULTS REVIEWED:
+- Hemoglobin A1c 7.1 % (04/10/2026)
+
+PLAN:
+- Medication reconciliation with pharmacy.
+- Return in 3 months.

@@ -1,0 +1,35 @@
+SYNTHETIC — NOT A REAL PATIENT
+Document Type: Hospital Discharge Summary
+Facility: Lakeside Regional Medical Center (fictional)
+Attending: Marcus Bell, MD (fictional)
+Admission Date: 2026-03-29
+Discharge Date: 2026-04-02
+Patient: Dana R. Whitfield (fictional)
+DOB: 07/14/1968
+Sex: Female
+
+DISCHARGE DIAGNOSES:
+- Atrial fibrillation with rapid ventricular response (new diagnosis)
+- Hypertension
+- Type 2 diabetes mellitus
+
+HOSPITAL COURSE:
+Presented with palpitations and was found to be in atrial fibrillation. Underwent electrical cardioversion on 03/31/2026 with return to sinus rhythm. Metoprolol succinate increased from 25 mg to 50 mg daily. Lisinopril increased from 10 mg to 20 mg daily for blood pressure control. Atorvastatin discontinued due to myalgias. Apixaban started for stroke prevention. Prior echocardiogram (03/02/2026) showed LVEF 55 %.
+
+ALLERGIES:
+- Penicillin (anaphylaxis)
+- Sulfa drugs (rash)
+
+LABS DURING ADMISSION:
+- Potassium 3.4 mmol/L (03/29/2026)
+- Creatinine 1.0 mg/dL (03/29/2026)
+- TSH 2.1 mIU/L (03/29/2026)
+
+DISCHARGE MEDICATIONS:
+- Apixaban 5 mg twice daily
+- Metoprolol succinate 50 mg daily
+- Lisinopril 20 mg daily
+- Metformin 500 mg twice daily
+
+FOLLOW-UP:
+Primary care within 2 weeks. Cardiology within 4 weeks.

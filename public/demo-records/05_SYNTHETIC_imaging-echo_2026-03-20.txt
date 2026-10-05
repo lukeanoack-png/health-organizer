@@ -1,0 +1,21 @@
+SYNTHETIC — NOT A REAL PATIENT
+Document Type: Imaging Report — Transthoracic Echocardiogram
+Facility: Summit Imaging Center (fictional)
+Reading Physician: Elena Varga, MD (fictional)
+Date of Service: 2026-03-20
+Patient: Dana R. Whitfield (fictional)
+DOB: 07/14/1968
+
+EXAM:
+Transthoracic echocardiogram, complete.
+
+INDICATION:
+Palpitations.
+
+FINDINGS:
+- LVEF 55 % (visual estimate 55 to 60 percent)
+- Mild left ventricular hypertrophy.
+- No significant valvular disease.
+
+IMPRESSION:
+Normal left ventricular systolic function. Mild left ventricular hypertrophy.

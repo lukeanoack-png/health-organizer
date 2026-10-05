@@ -1,0 +1,33 @@
+SYNTHETIC — NOT A REAL PATIENT
+Document Type: Primary Care Office Visit — Follow-up
+Facility: Maple Grove Family Medicine (fictional)
+Provider: Priya Natarajan, MD (fictional)
+Date of Service: 2026-03-04
+Patient: Dana R. Whitfield (fictional)
+DOB: 07/14/1968
+Sex: Female
+
+HISTORY OF PRESENT ILLNESS:
+Follow-up after starting atorvastatin. Reports intermittent palpitations over the past three weeks, lasting minutes at a time.
+
+PROBLEM LIST:
+- Hypertension
+- Type 2 diabetes mellitus
+- Hyperlipidemia
+- Palpitations
+
+CURRENT MEDICATIONS:
+- Lisinopril 10 mg by mouth once daily
+- Metformin 500 mg by mouth twice daily
+- Atorvastatin 20 mg by mouth nightly
+
+ALLERGIES:
+- Penicillin (hives)
+
+RESULTS REVIEWED:
+- Hemoglobin A1c 7.4 % (collected 01/15/2026)
+- LDL cholesterol 162 mg/dL (collected 01/15/2026)
+
+PLAN:
+- Referral to cardiology for palpitations.
+- Continue current medications.

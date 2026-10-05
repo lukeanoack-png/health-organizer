@@ -1,0 +1,34 @@
+SYNTHETIC — NOT A REAL PATIENT
+Document Type: Primary Care Office Visit — Annual Wellness
+Facility: Maple Grove Family Medicine (fictional)
+Provider: Priya Natarajan, MD (fictional)
+Date of Service: 2026-01-15
+Patient: Dana R. Whitfield (fictional)
+DOB: 07/14/1968
+Sex: Female
+
+CHIEF COMPLAINT:
+Annual wellness visit and chronic condition follow-up.
+
+HISTORY OF PRESENT ILLNESS:
+Patient reports feeling generally well. Home blood pressure readings mostly 130s/80s. Denies chest pain. Denies shortness of breath.
+
+PROBLEM LIST:
+- Hypertension
+- Type 2 diabetes mellitus
+- Hyperlipidemia
+
+CURRENT MEDICATIONS:
+- Lisinopril 10 mg by mouth once daily
+- Metformin 500 mg by mouth twice daily
+
+ALLERGIES:
+- Penicillin (hives)
+
+HEALTH MAINTENANCE:
+- Colonoscopy 11/03/2025, no polyps per patient report
+
+PLAN:
+- Start atorvastatin 20 mg by mouth nightly.
+- Fasting labs today: hemoglobin A1c, lipid panel, basic metabolic panel.
+- Return in 6 to 8 weeks.
