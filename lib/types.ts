@@ -144,11 +144,26 @@ export type ConflictType =
   | "demographic";
 
 /**
- * unexplained:          sources disagree and no record documents a change between them.
- * documented_change:    sources differ, and a record documents a change that could account
- *                       for it. Still shown; still needs a human to confirm.
+ * Explanation state — what the records themselves document, never a verdict:
+ *   unexplained:          sources disagree and no record documents a change between them.
+ *   partially_explained:  a record documents a change that accounts for some of the differing
+ *                         claims, but other claims are inconsistent with it.
+ *   documented_change:    a documented change is consistent with every differing claim.
+ * All three are still shown and still need a human to review them.
  */
-export type ConflictPattern = "unexplained" | "documented_change";
+export type ConflictPattern = "unexplained" | "partially_explained" | "documented_change";
+
+/**
+ * A dated observation tied to the claims it is about.
+ *   explained:   these claims are consistent with a documented change
+ *   unexplained: these claims are not accounted for by anything in the records
+ *   context:     a passage that documents a change (evidence, not a resolution)
+ */
+export interface ConflictNote {
+  kind: "explained" | "unexplained" | "context";
+  text: string;
+  factIds: string[];
+}
 
 export interface Conflict {
   id: string;
@@ -161,8 +176,8 @@ export interface Conflict {
   factIds: string[];
   /** The competing claims, grouped by what they assert, for side-by-side display. Not ranked. */
   groups: { label: string; factIds: string[] }[];
-  /** Neutral, dated observations about how the claims relate in time. */
-  observations: string[];
+  /** Neutral, dated observations, each linked to the claims it concerns. */
+  observations: ConflictNote[];
   /** Facts that document a change and may provide context (not "the answer"). */
   contextFactIds: string[];
 }

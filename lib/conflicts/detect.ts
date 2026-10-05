@@ -7,11 +7,11 @@
  *     they assert and shown side by side.
  *   • Identical repeated facts are corroboration, not conflict.
  *   • Absence is not contradiction: a drug missing from one list is not flagged.
- *   • When a record explicitly documents a change (e.g. "increased from 10 mg to 20 mg")
- *     that falls between two differing claims, the conflict is labelled
- *     `documented_change` instead of `unexplained` — but it is still surfaced for a human.
+ *   • A documented change (e.g. "increased from 10 mg to 20 mg") is checked claim by claim
+ *     against its date. It can explain some differing records without explaining all of
+ *     them, and every note says which claims it is about.
  */
-import type { Conflict, ConflictType, Fact } from "../types";
+import type { Conflict, ConflictNote, ConflictType, Fact } from "../types";
 import {
   ALLERGENS, CONDITIONS, IMAGING, LABS, MEDICATIONS, MUTUALLY_EXCLUSIVE_CONDITIONS, PROCEDURES,
 } from "../normalize/lexicon";
@@ -52,14 +52,23 @@ export function displayName(key: string): string {
   return key.charAt(0).toUpperCase() + key.slice(1);
 }
 
-/** "Cardiology Consultation (Mar 12, 2026)" — how a source is named in observations. */
+/** "primary care note dated Mar 4, 2026" — how a source is named in notes. */
 export function sourceLabel(f: Fact): string {
   return `${f.source.documentType.toLowerCase()} dated ${formatDate(f.source.recordDate)}`;
 }
 
+const shortDate = (iso: string) => formatDate(iso).replace(/, \d{4}$/, "");
+
+/** "Jan 15 and Mar 4" / "Jan 15, Mar 4 and Apr 2" — unique record dates of some claims. */
+function datesOf(fs: Fact[]): string {
+  const ds = [...new Set(fs.sort(chrono).map((f) => shortDate(f.source.recordDate ?? factDate(f))))];
+  return ds.length <= 1 ? ds.join("") : `${ds.slice(0, -1).join(", ")} and ${ds[ds.length - 1]}`;
+}
+
 function makeConflict(
   type: ConflictType, subject: string, title: string, explanation: string,
-  groups: { label: string; facts: Fact[] }[], opts: { pattern?: Conflict["pattern"]; context?: Fact[]; observations?: string[] } = {},
+  groups: { label: string; facts: Fact[] }[],
+  opts: { pattern?: Conflict["pattern"]; context?: Fact[]; notes?: ConflictNote[] } = {},
 ): Conflict {
   const all = groups.flatMap((g) => g.facts).sort(chrono);
   return {
@@ -71,9 +80,18 @@ function makeConflict(
     pattern: opts.pattern ?? "unexplained",
     factIds: [...new Set(all.map((f) => f.id))],
     groups: groups.map((g) => ({ label: g.label, factIds: g.facts.sort(chrono).map((f) => f.id) })),
-    observations: opts.observations ?? [],
+    observations: opts.notes ?? [],
     contextFactIds: (opts.context ?? []).sort(chrono).map((f) => f.id),
   };
+}
+
+const note = (kind: ConflictNote["kind"], text: string, facts: Fact[]): ConflictNote => ({ kind, text, factIds: facts.map((f) => f.id) });
+
+/** Classify claims against documented changes: which fit, which don't. */
+function patternFor(changes: Fact[], consistent: Fact[], inconsistent: Fact[]): Conflict["pattern"] {
+  if (!changes.length) return "unexplained";
+  if (!inconsistent.length) return "documented_change";
+  return consistent.length ? "partially_explained" : "unexplained";
 }
 
 // ---------------------------------------------------------------- medications
@@ -98,7 +116,18 @@ function clusterDoses(listings: Fact[]): Fact[][] {
     if (c) c.push(f);
     else clusters.push([f]);
   }
-  return clusters;
+  return clusters.sort((a, b) => chrono(a.sort(chrono)[0], b.sort(chrono)[0]));
+}
+
+/** The dose the documented changes imply at a date, or null if none apply. */
+function expectedDose(changes: Fact[], date: string): { amount?: number; unit?: string; change: Fact } | null {
+  const before = changes.filter((c) => factDate(c) <= date);
+  if (before.length) {
+    const c = before[before.length - 1];
+    return { amount: c.detail.doseAmount, unit: c.detail.doseUnit, change: c };
+  }
+  const after = changes.find((c) => factDate(c) > date);
+  return after ? { amount: after.detail.previousDoseAmount, unit: after.detail.previousDoseUnit, change: after } : null;
 }
 
 function medicationDoseConflict(key: string, group: Fact[]): Conflict | null {
@@ -110,46 +139,64 @@ function medicationDoseConflict(key: string, group: Fact[]): Conflict | null {
   if (clusters.length < 2) return null;
 
   const name = displayName(key);
-  const observations: string[] = [];
-  let unexplained = false;
-  let prev = listings[0];
-  for (const curr of listings.slice(1)) {
-    if (sameDose(prev, curr)) { prev = curr; continue; }
-    const p = factDate(prev);
-    const c = factDate(curr);
-    const explaining = changes.find(
-      (ch) =>
-        ch.detail.doseAmount === curr.detail.doseAmount &&
-        ch.detail.doseUnit === curr.detail.doseUnit &&
-        factDate(ch) > p && factDate(ch) <= c,
-    );
-    const stale = changes.find(
-      (ch) =>
-        ch.detail.previousDoseAmount === curr.detail.doseAmount &&
-        ch.detail.doseAmount === prev.detail.doseAmount &&
-        factDate(ch) <= c,
-    );
-    const pair = `The ${sourceLabel(prev)} lists ${fullSig(prev)}; the ${sourceLabel(curr)} lists ${fullSig(curr)}.`;
-    if (explaining) {
-      observations.push(`${pair} The ${sourceLabel(explaining)} documents a change from ${explaining.detail.previousDoseAmount} ${explaining.detail.previousDoseUnit} to ${explaining.detail.doseAmount} ${explaining.detail.doseUnit}, which falls between these records.`);
-    } else if (stale) {
-      unexplained = true;
-      observations.push(`${pair} The later record matches the dose from before the change documented in the ${sourceLabel(stale)}.`);
-    } else {
-      unexplained = true;
-      observations.push(`${pair} ${p === c ? "Both records carry the same date." : "No record between these dates documents a dose change."}`);
+  // Name clusters by dose alone unless they only differ by frequency.
+  const byAmountOnly = new Set(clusters.map((cl) => doseSig(cl[0]))).size === clusters.length;
+  const label = (cl: Fact[]) => (byAmountOnly ? doseSig(cl[0]) : fullSig(cl.find((f) => f.detail.frequency) ?? cl[0]));
+  const notes: ConflictNote[] = [];
+  let consistent: Fact[] = [];
+  let inconsistent: Fact[] = [];
+
+  if (!changes.length) {
+    inconsistent = listings;
+    let prev = listings[0];
+    for (const curr of listings.slice(1)) {
+      if (!sameDose(prev, curr)) {
+        notes.push(note("unexplained",
+          `The ${sourceLabel(prev)} records ${fullSig(prev)}; the ${sourceLabel(curr)} records ${fullSig(curr)}. ` +
+          (factDate(prev) === factDate(curr) ? "Both carry the same date." : "No record documents a dose change between them."),
+          [prev, curr]));
+      }
+      prev = curr;
     }
-    prev = curr;
+  } else {
+    for (const c of changes) {
+      notes.push(note("context", `The ${sourceLabel(c)} documents a change from ${c.detail.previousDoseAmount} ${c.detail.previousDoseUnit} to ${c.detail.doseAmount} ${c.detail.doseUnit}: “${c.source.excerpt.trim()}”`, [c]));
+    }
+    for (const l of listings) {
+      const exp = expectedDose(changes, factDate(l));
+      if (exp && exp.amount === l.detail.doseAmount && exp.unit === l.detail.doseUnit) consistent.push(l);
+      else inconsistent.push(l);
+    }
+    const side = (f: Fact) => {
+      const c = expectedDose(changes, factDate(f))!.change;
+      return `${factDate(c) > factDate(f) ? "before" : "on or after"} ${shortDate(factDate(c))}`;
+    };
+    for (const [k, fs] of groupBy(consistent, (f) => `${doseSig(f)}|${side(f)}`)) {
+      const [dose, when] = k.split("|");
+      notes.push(note("explained", `Consistent with the documented change: ${dose} in records dated ${datesOf(fs)} (${when}).`, fs));
+    }
+    for (const l of inconsistent) {
+      const exp = expectedDose(changes, factDate(l))!;
+      const when = factDate(exp.change) > factDate(l) ? "before" : "after";
+      notes.push(note("unexplained",
+        when === "before"
+          ? `The ${sourceLabel(l)} records ${doseSig(l)} before the change documented on ${shortDate(factDate(exp.change))}. That change does not explain this record.`
+          : `The ${sourceLabel(l)} records ${doseSig(l)} after the change to ${exp.amount} ${exp.unit} documented on ${shortDate(factDate(exp.change))}. That change does not explain this record.`,
+        [l]));
+    }
   }
+
+  const pattern = patternFor(changes, consistent, inconsistent);
+  const explanation = {
+    unexplained: `Sources record different ${name} doses. No source documents a dose change that accounts for the difference. This may reflect an undocumented change or a documentation discrepancy.`,
+    partially_explained: `A source documents a ${name} dose change. It accounts for some of the differing records, but not all of them.`,
+    documented_change: `A source documents a ${name} dose change that is consistent with every differing record. Confirm against the sources.`,
+  }[pattern];
+
   return makeConflict(
-    "medication_dose",
-    key,
-    `${name} dose`,
-    unexplained
-      ? `Sources report different doses of ${name}. This may represent a medication change or a documentation discrepancy. No record is treated as more accurate than another.`
-      : `Sources report different doses of ${name}. A record documents a dose change that may account for the difference. Confirm against the source documents.`,
-    clusters.map((cl) => ({ label: fullSig(cl.find((f) => f.detail.frequency) ?? cl[0]), facts: cl })),
-    { pattern: unexplained ? "unexplained" : "documented_change", context: changes, observations },
+    "medication_dose", key, `${name}: ${clusters.map(label).join(" vs ")}`, explanation,
+    clusters.map((cl) => ({ label: label(cl), facts: cl })),
+    { pattern, context: changes, notes },
   );
 }
 
@@ -158,36 +205,32 @@ function medicationStatusConflict(key: string, group: Fact[]): Conflict | null {
   const actives = group.filter((f) => (f.status === "active" || f.status === "started") && !f.detail.isChangeStatement).sort(chrono);
   if (!stops.length || !actives.length) return null;
   const name = displayName(key);
-  const firstStop = stops[0];
-  const observations: string[] = [];
-  let unexplained = false;
+  const notes: ConflictNote[] = stops.map((s) =>
+    note("context", `The ${sourceLabel(s)} records ${name} as ${s.status}: “${s.source.excerpt.trim()}”`, [s]));
+  const consistent: Fact[] = [];
+  const inconsistent: { a: Fact; stop: Fact }[] = [];
   for (const a of actives) {
     const stopBefore = [...stops].reverse().find((s) => factDate(s) < factDate(a));
-    if (!stopBefore) continue;
-    const restart = actives.find((s) => s.status === "started" && factDate(s) > factDate(stopBefore) && factDate(s) <= factDate(a));
-    if (restart) {
-      observations.push(`The ${sourceLabel(restart)} records ${name} as started again after the ${sourceLabel(stopBefore)} recorded it as ${stopBefore.status}.`);
-      continue;
-    }
-    unexplained = true;
-    observations.push(`The ${sourceLabel(a)} lists ${name} as current after the ${sourceLabel(stopBefore)} recorded it as ${stopBefore.status}.`);
+    const restarted = stopBefore && actives.some((s) => s.status === "started" && factDate(s) > factDate(stopBefore) && factDate(s) <= factDate(a));
+    if (!stopBefore || restarted) consistent.push(a);
+    else inconsistent.push({ a, stop: stopBefore });
   }
-  const lastActiveBeforeStop = actives.filter((a) => factDate(a) <= factDate(firstStop)).pop();
-  if (lastActiveBeforeStop) {
-    observations.unshift(`${name} is listed as current up to the ${sourceLabel(lastActiveBeforeStop)}; the ${sourceLabel(firstStop)} records it as ${firstStop.status}.`);
-  }
+  if (consistent.length)
+    notes.push(note("explained", `Listed as current before the first recorded discontinuation (${shortDate(factDate(stops[0]))}): records dated ${datesOf(consistent)}.`, consistent));
+  for (const { a, stop } of inconsistent)
+    notes.push(note("unexplained", `The ${sourceLabel(a)} lists ${name} as current after the ${sourceLabel(stop)} recorded it as ${stop.status}. No record documents a restart.`, [a]));
+
+  const pattern = patternFor(stops, consistent, inconsistent.map((x) => x.a));
   return makeConflict(
-    "medication_status",
-    key,
-    unexplained ? `${name}: listed as current and as discontinued` : `${name}: later recorded as discontinued`,
-    unexplained
-      ? `Some sources list ${name} as a current medication while another records it as discontinued, and the current listing is dated after the discontinuation. This may reflect a restart that was not documented, or a medication list that was carried forward.`
-      : `${name} appears as current in earlier records and as discontinued in a later record. This is consistent with a documented discontinuation, but should be confirmed against the sources.`,
+    "medication_status", key, `${name}: listed as current vs discontinued`,
+    pattern === "documented_change"
+      ? `${name} is listed as current in earlier records and recorded as discontinued later. This fits the recorded discontinuation; confirm against the sources.`
+      : `A recorded discontinuation accounts for the earlier listings, but at least one later record still lists ${name} as current.`,
     [
       { label: "Listed as current", facts: actives },
-      { label: "Recorded as discontinued / held", facts: stops },
+      { label: "Recorded as discontinued", facts: stops },
     ],
-    { pattern: unexplained ? "unexplained" : "documented_change", observations },
+    { pattern, notes },
   );
 }
 
@@ -205,26 +248,26 @@ function allergyConflicts(facts: Fact[]): Conflict[] {
     const negatives = [...group.filter((f) => f.status === "negated"), ...nkda].sort(chrono);
     if (positives.length && negatives.length) {
       const firstPos = factDate(positives[0]);
-      const observations = negatives.map((n) =>
-        factDate(n) < firstPos
-          ? `The ${sourceLabel(n)} records no allergy here; this predates the first record of a ${name} allergy (${formatDate(firstPos)}). This may reflect a newly identified allergy or a documentation discrepancy.`
-          : `The ${sourceLabel(n)} records no ${name} allergy, although an earlier record (${formatDate(firstPos)}) lists one.`,
-      );
+      const notes = negatives.map((n) =>
+        note("unexplained", factDate(n) < firstPos
+          ? `The ${sourceLabel(n)} records no known allergies; the first record of a ${name} allergy is later (${shortDate(firstPos)}). This may be a newly identified allergy or a documentation discrepancy.`
+          : `The ${sourceLabel(n)} records no ${name} allergy, although an earlier record (${shortDate(firstPos)}) lists one.`, [n]));
+      const negLabel = negatives.every((n) => n.normalizedLabel === NKDA) ? "NKDA" : "denied";
       out.push(makeConflict(
-        "allergy", key, `${name} allergy`,
-        `Some sources record a ${name} allergy and at least one source records no known allergies. Allergy information should be reviewed against the original documents.`,
+        "allergy", key, `${name} allergy: recorded vs ${negLabel}`,
+        `Some sources record a ${name} allergy and at least one source records no known drug allergies.`,
         [
           { label: `${name} allergy recorded`, facts: positives },
-          { label: "No known allergies / denied", facts: negatives },
+          { label: "No known drug allergies", facts: negatives },
         ],
-        { observations },
+        { notes },
       ));
     }
     const byReaction = groupBy(positives.filter((f) => f.detail.reaction), (f) => f.detail.reaction!);
     if (byReaction.size > 1) {
       out.push(makeConflict(
-        "allergy_reaction", key, `${name} allergy: reaction differs`,
-        `Sources agree that a ${name} allergy is recorded but describe the reaction differently. This may reflect different levels of detail or a documentation discrepancy.`,
+        "allergy_reaction", key, `${name} reaction: ${[...byReaction.keys()].join(" vs ")}`,
+        `Sources agree a ${name} allergy is recorded but describe the reaction differently. This may reflect different levels of detail or a documentation discrepancy.`,
         [...byReaction].map(([r, fs]) => ({ label: `Reaction: ${r}`, facts: fs })),
       ));
     }
@@ -245,18 +288,18 @@ function conditionConflicts(facts: Fact[]): Conflict[] {
     if (!pos.length || !neg.length) continue;
     const name = displayName(key);
     out.push(makeConflict(
-      "condition", key, `${name}: recorded vs. denied`,
-      `At least one source records ${name} and another explicitly states there is no history of it. Neither statement is treated as correct here.`,
+      "condition", key, `${name}: recorded vs denied`,
+      `At least one source records ${name.toLowerCase()} and another states there is no history of it.`,
       [
         { label: `${name} recorded`, facts: pos },
         { label: "Explicitly denied", facts: neg },
       ],
       {
-        observations: neg.map((n) => {
+        notes: neg.map((n) => {
           const earlier = pos.filter((p) => factDate(p) < factDate(n));
-          return earlier.length
+          return note("unexplained", earlier.length
             ? `The ${sourceLabel(n)} denies ${name.toLowerCase()} after the ${sourceLabel(earlier[earlier.length - 1])} recorded it.`
-            : `The ${sourceLabel(n)} denies ${name.toLowerCase()}; it is recorded in a later source.`;
+            : `The ${sourceLabel(n)} denies ${name.toLowerCase()}; a later source records it.`, [n, ...earlier.slice(-1)]);
         }),
       },
     ));
@@ -268,8 +311,8 @@ function conditionConflicts(facts: Fact[]): Conflict[] {
     if (present.length < 2) continue;
     const names = present.map((p) => displayName(p.key));
     out.push(makeConflict(
-      "condition", set.join("+"), `Differing diagnoses: ${names.join(" vs. ")}`,
-      `Different sources record ${names.join(" and ")} as current diagnoses. These are not normally recorded together. This may reflect a documentation discrepancy or different information available to each source.`,
+      "condition", set.join("+"), names.map((n, i) => (i ? n.toLowerCase() : n)).join(" vs "),
+      `Different sources record ${names.join(" and ")} as current diagnoses. Each is kept as written; they are linked here because they are not normally recorded together.`,
       present.map((p) => ({ label: displayName(p.key), facts: p.facts })),
     ));
   }
@@ -299,10 +342,11 @@ function labConflicts(facts: Fact[]): Conflict[] {
     if (clusters.length < 2) continue;
     const [key, date] = k.split("|");
     const name = displayName(key);
+    const val = (cl: Fact[]) => `${cl[0].value}${cl[0].units ? ` ${cl[0].units}` : ""}`;
     out.push(makeConflict(
-      "lab_value", `${key} ${date}`, `${name} on ${formatDate(date)}: values differ`,
+      "lab_value", `${key} ${date}`, `${name} (${formatDate(date)}): ${clusters.map(val).join(" vs ")}`,
       `Sources report different values for what appears to be the same test on the same date. This may be a transcription difference, a different specimen, or a unit difference.`,
-      clusters.map((cl) => ({ label: `${cl[0].value}${cl[0].units ? ` ${cl[0].units}` : ""}`, facts: cl })),
+      clusters.map((cl) => ({ label: val(cl), facts: cl })),
     ));
   }
   return out;
@@ -337,10 +381,11 @@ function eventDateConflicts(facts: Fact[]): Conflict[] {
       }
     if (involved.size < 2) continue;
     const name = displayName(key);
+    const ds = [...involved].sort();
     out.push(makeConflict(
-      "event_date", key, `${name}: dates differ`,
+      "event_date", key, `${name} date: ${ds.map(shortDate).join(" vs ")}`,
       `Sources give different dates for a ${name.toLowerCase()} within ${DATE_WINDOW_DAYS} days of each other. This may be two separate studies or a date discrepancy in one record.`,
-      [...involved].sort().map((d) => ({ label: formatDate(d), facts: byDate.get(d)! })),
+      ds.map((d) => ({ label: formatDate(d), facts: byDate.get(d)! })),
     ));
   }
   return out;
@@ -355,10 +400,12 @@ function demographicConflicts(facts: Fact[]): Conflict[] {
     const byValue = groupBy(group, (f) => (f.value ?? "").toLowerCase().replace(/[^a-z0-9-]/g, ""));
     if (byValue.size < 2) continue;
     const label = group[0].label;
+    const show = (fs: Fact[]) => (key === "date of birth" ? formatDate(fs[0].value) : fs[0].value ?? "");
+    const groups = [...byValue.values()].map((fs) => ({ label: show(fs), facts: fs }));
     out.push(makeConflict(
-      "demographic", key, `${label} differs between sources`,
-      `Sources record different values for ${label.toLowerCase()}. This may be a data-entry discrepancy, or a sign that a document belongs to a different person. Review the source headers.`,
-      [...byValue.values()].map((fs) => ({ label: key === "date of birth" ? formatDate(fs[0].value) : fs[0].value ?? "", facts: fs })),
+      "demographic", key, `${label}: ${groups.map((g) => g.label).join(" vs ")}`,
+      `Sources record different values for ${label.toLowerCase()}. This may be a data-entry discrepancy, or a sign that a document belongs to a different person.`,
+      groups,
     ));
   }
   return out;
@@ -370,6 +417,7 @@ const TYPE_ORDER: ConflictType[] = [
   "medication_dose", "medication_status", "allergy", "allergy_reaction", "condition",
   "lab_value", "event_date", "demographic",
 ];
+const PATTERN_ORDER: Conflict["pattern"][] = ["unexplained", "partially_explained", "documented_change"];
 
 export function detectConflicts(facts: Fact[]): Conflict[] {
   const out: Conflict[] = [];
@@ -384,7 +432,7 @@ export function detectConflicts(facts: Fact[]): Conflict[] {
     ...eventDateConflicts(facts), ...demographicConflicts(facts));
   return out.sort(
     (a, b) =>
-      Number(a.pattern !== "unexplained") - Number(b.pattern !== "unexplained") ||
+      PATTERN_ORDER.indexOf(a.pattern) - PATTERN_ORDER.indexOf(b.pattern) ||
       TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) ||
       a.title.localeCompare(b.title),
   );

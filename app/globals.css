@@ -8,15 +8,18 @@
 
 body {
   @apply bg-canvas text-ink antialiased;
-  font-feature-settings: "cv11", "ss01";
+}
+
+/* One visible focus style everywhere, for keyboard users. */
+:focus-visible {
+  outline: 2px solid #b42336;
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 mark.evidence {
-  @apply rounded-sm bg-amber-200/80 px-0.5 text-ink ring-2 ring-amber-300;
-}
-
-mark.evidence-secondary {
-  @apply rounded-sm bg-amber-100 px-0.5 text-ink;
+  @apply rounded-sm bg-[#FFE8A3] px-0.5 text-ink;
+  box-shadow: 0 0 0 2px #e9b949;
 }
 
 .scroll-thin {
@@ -25,27 +28,44 @@ mark.evidence-secondary {
 
 @layer components {
   .card {
-    @apply rounded-lg border border-line bg-white shadow-card;
+    @apply rounded-xl border border-line bg-surface shadow-card;
   }
-  .card-h {
-    @apply flex items-center justify-between border-b border-line px-4 py-3;
-  }
-  .h-section {
-    @apply text-[13px] font-semibold uppercase tracking-wide text-muted;
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.06em] text-muted;
   }
   .btn {
-    @apply inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-ink transition-colors hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply border-accent bg-accent text-white hover:bg-[#183f62];
+    @apply border-brand bg-brand text-white hover:border-brand-hover hover:bg-brand-hover;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent shadow-none hover:bg-subtle;
+  }
+  .link {
+    @apply font-semibold text-brand underline-offset-2 hover:text-brand-hover hover:underline;
+  }
+  .field {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted/80 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20;
+  }
+  /* Tables scroll inside their card on narrow screens instead of pushing the page. */
+  .table-wrap {
+    @apply relative overflow-x-auto;
   }
   .table-base {
-    @apply w-full text-left text-sm;
+    @apply w-full min-w-[640px] border-collapse text-left text-sm;
   }
-  .table-base th {
-    @apply border-b border-line bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted;
+  .table-base thead th {
+    @apply border-b border-line bg-subtle/60 px-4 py-2.5 text-xs font-semibold text-muted;
+  }
+  .table-base tbody th {
+    @apply border-b border-line px-4 py-3.5 align-top text-sm font-semibold text-ink;
   }
   .table-base td {
-    @apply border-b border-line px-3 py-2.5 align-top;
+    @apply border-b border-line px-4 py-3.5 align-top;
+  }
+  .table-base tr:last-child td,
+  .table-base tr:last-child th {
+    @apply border-b-0;
   }
 }

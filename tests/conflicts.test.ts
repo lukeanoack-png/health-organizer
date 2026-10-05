@@ -30,9 +30,11 @@ test("2. two documents reporting different doses produce an unexplained dose con
   assert.equal(c.type, "medication_dose");
   assert.equal(c.pattern, "unexplained");
   assert.equal(c.groups.length, 2, "both claims are shown side by side");
-  assert.deepEqual(c.groups.map((g) => g.label).sort(), ["10 mg once daily", "20 mg once daily"]);
+  assert.deepEqual(c.groups.map((g) => g.label), ["10 mg", "20 mg"]);
+  assert.equal(c.title, "Lisinopril: 10 mg vs 20 mg", "title names the competing values");
   // Neutral: does not pick the newer source.
-  assert.match(c.explanation, /may represent a medication change or a documentation discrepancy/);
+  assert.match(c.explanation, /No source documents a dose change/);
+  assert.match(c.explanation, /undocumented change or a documentation discrepancy/);
   assert.doesNotMatch(c.explanation, /\b(correct dose is|should be|newer record is correct)\b/i);
 });
 
@@ -52,8 +54,11 @@ test("3. active in one record and discontinued in a later record is a documented
     await doc("c.txt", "2026-04-15", meds("- Atorvastatin 20 mg nightly")),
   ]);
   const c2 = rs2.conflicts.find((x) => x.type === "medication_status")!;
-  assert.equal(c2.pattern, "unexplained");
-  assert.ok(c2.observations.some((o) => /lists Atorvastatin as current after/.test(o)));
+  assert.equal(c2.pattern, "partially_explained", "the stop explains the earlier listing, not the later one");
+  const later = rs2.facts.find((f) => f.source.documentName === "c.txt" && f.normalizedLabel === "atorvastatin")!;
+  const earlier = rs2.facts.find((f) => f.source.documentName === "a.txt" && f.normalizedLabel === "atorvastatin")!;
+  assert.ok(c2.observations.some((o) => o.kind === "unexplained" && o.factIds.includes(later.id) && /as current after/.test(o.text)));
+  assert.ok(c2.observations.some((o) => o.kind === "explained" && o.factIds.includes(earlier.id)));
 });
 
 test("4. two sources disagreeing about an allergy produce an allergy conflict", async () => {
@@ -107,8 +112,11 @@ test("6. a documented later change is distinguishable from an unexplained contra
     await doc("c.txt", "2026-04-15", meds("- Lisinopril 10 mg daily")),
   ]);
   const s = stale.conflicts.find((c) => c.type === "medication_dose")!;
-  assert.equal(s.pattern, "unexplained");
-  assert.ok(s.observations.some((o) => /dose from before the change/.test(o)));
+  assert.equal(s.pattern, "partially_explained");
+  const apr15 = stale.facts.find((f) => f.source.documentName === "c.txt" && f.category === "medication")!;
+  const unexplainedNote = s.observations.find((o) => o.kind === "unexplained")!;
+  assert.deepEqual(unexplainedNote.factIds, [apr15.id], "the note is linked to exactly the claim it does not explain");
+  assert.match(unexplainedNote.text, /after the change to 20 mg documented on Apr 2/);
 });
 
 test("7. every extracted fact and every conflict keeps its source reference", async () => {
@@ -150,8 +158,12 @@ test("conditions: a record denying what another asserts is flagged; mutually exc
     await doc("d.txt", "2026-04-15", "PAST MEDICAL HISTORY:\n- No history of atrial fibrillation"),
   ]);
   const titles = rs.conflicts.map((c) => c.title);
-  assert.ok(titles.includes("Atrial fibrillation: recorded vs. denied"));
-  assert.ok(titles.some((t) => /Type 2 diabetes mellitus vs\. Prediabetes/.test(t)));
+  assert.ok(titles.includes("Atrial fibrillation: recorded vs denied"));
+  assert.ok(titles.includes("Type 2 diabetes mellitus vs prediabetes"));
+  // Both diagnoses stay distinct facts with their own wording; the conflict only links them.
+  const ex = rs.conflicts.find((c) => c.title === "Type 2 diabetes mellitus vs prediabetes")!;
+  assert.deepEqual(ex.groups.map((g) => g.label), ["Type 2 diabetes mellitus", "Prediabetes"]);
+  assert.ok(rs.facts.some((f) => f.normalizedLabel === "prediabetes" && f.source.excerpt === "Prediabetes"));
 });
 
 test("labs: same test and date with different values conflicts; different dates do not", async () => {

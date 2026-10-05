@@ -43,10 +43,11 @@ export function buildTimeline(facts: Fact[]): TimelineEvent[] {
     }
     if (f.category === "medication") {
       const name = displayName(f.normalizedLabel);
-      if (f.status === "started") out.push(ev("medication_started", d, `${name} started`, [f], f.value ?? undefined));
-      if (f.status === "changed") out.push(ev("medication_changed", d, `${name} dose changed`, [f], f.value ?? undefined));
+      // Titles say what the source says: a "change" event exists only where a passage documents one.
+      if (f.status === "started") out.push(ev("medication_started", d, `${name} start documented`, [f], f.value ?? undefined));
+      if (f.status === "changed") out.push(ev("medication_changed", d, `${name} dose change documented`, [f], f.value ?? undefined));
       if (f.status === "discontinued" || f.status === "held")
-        out.push(ev("medication_discontinued", d, `${name} ${f.status === "held" ? "held" : f.source.section?.startsWith("Table") ? "listed as discontinued" : "discontinued"}`, [f]));
+        out.push(ev("medication_discontinued", d, `${name} ${f.status === "held" ? "hold documented" : f.source.section?.startsWith("Table") ? "listed as discontinued" : "discontinuation documented"}`, [f]));
     }
     if (f.category === "imaging" || f.category === "procedure") {
       const name = displayName(f.normalizedLabel);

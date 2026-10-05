@@ -205,17 +205,22 @@ function conflictQuery(rs: RecordSet, q: string): Answer {
   if (!list.length) return { kind: "answer", summary: types.length ? "No conflicts of that kind were detected in the loaded records. (Detection is rule-based and may miss some.)" : "No conflicts were detected in the loaded records.", statements: [], conflictIds: [] };
   const statements = list.map((c) => {
     const facts = c.factIds.map((id) => rs.facts.find((f) => f.id === id)!).filter(Boolean);
-    const sides = c.groups.map((g) => `${g.label} (${g.factIds.map((id) => { const f = rs.facts.find((x) => x.id === id)!; return `${f.source.documentType.toLowerCase()}, ${formatDate(f.source.recordDate)}`; }).join("; ")})`);
+    const sides = c.groups.map((g) => `${g.label} in ${g.factIds.map((id) => { const f = rs.facts.find((x) => x.id === id)!; return `${f.source.documentType.toLowerCase()} (${formatDate(f.source.recordDate)})`; }).join(", ")}`);
+    const explained = {
+      unexplained: " No record documents a change that accounts for this.",
+      partially_explained: " A documented change accounts for some of these records, but not all.",
+      documented_change: " A documented change is consistent with these records.",
+    }[c.pattern];
     return {
-      text: `${c.title}: ${sides.join(" vs. ")}.${c.pattern === "documented_change" ? " A record documents a change that may account for this." : ""}`,
+      text: `${c.title}. ${sides.join("; versus ")}.${explained}`,
       citations: facts.map(cite),
       disagreement: true,
     };
   });
-  const unexplained = list.filter((c) => c.pattern === "unexplained").length;
+  const unexplained = list.filter((c) => c.pattern !== "documented_change").length;
   return {
     kind: "answer",
-    summary: `Yes — ${list.length} possible conflict${list.length > 1 ? "s" : ""} (${unexplained} without a documented explanation). The sources disagree; this tool does not decide which is correct.`,
+    summary: `Yes — ${list.length} possible conflict${list.length > 1 ? "s" : ""} (${unexplained} not fully explained by a documented change). The sources disagree; this tool does not decide which is correct.`,
     statements,
     conflictIds: list.map((c) => c.id),
   };

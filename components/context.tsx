@@ -8,7 +8,7 @@ export type View =
   | "overview" | "timeline" | "medications" | "conditions" | "allergies" | "labs"
   | "studies" | "visits" | "providers" | "conflicts" | "sources" | "ask";
 
-/** What the evidence drawer shows: a document plus the passages to highlight. */
+/** What the evidence panel shows: one document plus the passages to highlight. */
 export interface EvidenceTarget {
   documentId: string;
   ranges: { start: number; end: number }[];
@@ -18,17 +18,21 @@ export interface EvidenceTarget {
 
 export interface RecordsCtx {
   rs: RecordSet;
+  busy: boolean;
   doc: (id: string) => RawDocument | undefined;
   fact: (id: string) => Fact | undefined;
-  /** Stable letter per document in chronological order: A, B, C… */
+  /** Stable source ID per document in chronological order: A, B, C… */
   letter: (documentId: string) => string;
+  /** Conflicts in which this fact is one of the competing claims (not mere context). */
   conflictsForFact: (factId: string) => Conflict[];
-  openFact: (factId: string, heading?: string) => void;
+  /** Open the evidence panel for facts from one document (all passages highlighted). */
+  openFacts: (factIds: string[], heading?: string) => void;
   openEvidence: (t: EvidenceTarget) => void;
   annotations: AnnotationMap;
   setReview: (c: Conflict, patch: { status?: ReviewStatus; note?: string }) => void;
-  isOpen: (c: Conflict) => boolean;
-  go: (v: View) => void;
+  /** Navigate; optionally open a specific conflict's evidence on the Conflicts page. */
+  go: (v: View, opts?: { conflictId?: string }) => void;
+  focusConflictId: string | null;
 }
 
 export const Records = createContext<RecordsCtx | null>(null);

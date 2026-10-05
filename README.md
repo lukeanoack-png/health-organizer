@@ -12,16 +12,13 @@ sources disagree without deciding which source is right**. The app organizes evi
 Needs Node.js 20.9+.
 
 ```bash
-cd tools/health-organizer
 npm install
 npm run dev          # http://localhost:3000 → click "Load Demo Records"
 ```
 
-On Windows you can double-click `start_health_organizer.bat` at the repo root instead.
-
 | Command | What it does |
 |---|---|
-| `npm test` | 25 tests: conflict rules, provenance, ingestion (TXT/CSV/DOCX/PDF), Ask Records, demo dataset |
+| `npm test` | 31 tests: conflict rules and explanation states, provenance, chip de-duplication, ingestion (TXT/CSV/DOCX/PDF), Ask Records, demo dataset |
 | `npm run typecheck` | TypeScript check |
 | `npm run build && npm start` | Production build (the page is fully static) |
 | `npm run dump` | Prints every fact, conflict and timeline event extracted from the demo records |
@@ -31,7 +28,7 @@ On Windows you can double-click `start_health_organizer.bat` at the repo root in
 
 The app has no server code, API keys, or database. Files are parsed in the browser.
 
-- **Vercel**: import the repo, set *Root Directory* to `tools/health-organizer`, deploy. Defaults work.
+- **Vercel**: import the repo and deploy. Defaults work.
 - **Any static host** (GitHub Pages, Netlify): add `output: "export"` to `next.config.mjs`, run
   `npm run build`, and publish the generated `out/` folder.
 
@@ -86,14 +83,39 @@ a measure of whether the fact is true.
 | Same study, dates within 60 days differ | Echo Mar 20 (report) vs Mar 2 (as referenced) |
 | Demographics differ | DOB 07/14/1968 vs 04/17/1968 |
 
-Each conflict is labelled `unexplained` or `documented_change`. The second label applies when a record
-explicitly documents a change (e.g. "increased from 25 mg to 50 mg") that falls between the differing
-records. Both kinds appear in the Conflicts panel, and neither is resolved automatically. Identical
+**Explanation state** describes what the records document. It is not a verdict. A documented change
+(e.g. "Lisinopril increased from 10 mg to 20 mg" on Apr 2) is checked against each claim's date:
+
+| State | Meaning | Demo example |
+|---|---|---|
+| No documented explanation | No record documents a change that accounts for the difference | Penicillin vs NKDA |
+| Partly explained by a documented change | The change fits some claims but not others | Lisinopril: Jan 15, Mar 4 (10 mg) and Apr 2, Apr 20 (20 mg) fit the Apr 2 increase; Mar 12 (20 mg *before* it) and Apr 15 (10 mg *after* it) do not |
+| Documented change | The change fits every differing claim | Metoprolol 25 → 50 mg |
+
+Each note is linked to the exact claims it concerns, and in the expanded evidence every claim is
+marked "Fits the documented change" or "Not explained by the documented change". The timeline only
+says "dose change documented" where a passage states the change, and links to that passage. Identical
 repeated facts count as corroboration, not conflict, and a missing item is not treated as a contradiction.
 
-Review statuses (Unresolved / Reviewed / Explained by timeline / Likely documentation error) and notes
-are annotations stored separately. They never change or hide evidence. If new documents change a
-conflict's evidence after it was reviewed, the card shows "New evidence since review".
+**Review state** is separate: Unresolved / Reviewed / Explained by timeline / Likely documentation
+error. These are a person's annotations, stored apart from the evidence. They never change or hide it,
+and reviewing a conflict does not establish which claim is true. If new documents change a conflict's
+evidence after it was reviewed, the card shows "New evidence added since review".
+
+### Interface conventions
+
+- **Source chip** `[A] Primary care · Jan 15`: one chip per document, where the letter is the source ID
+  (chronological). If a document has several relevant passages, the chip shows `×2` and its evidence
+  panel highlights all of them.
+- **Colour**: crimson is used for brand, primary actions and the selected navigation item. Amber marks
+  review state and is always paired with an icon and a text label. Colour never signals clinical
+  severity. All text/background pairs meet WCAG AA (lowest 5.6:1).
+- **Conditions**: a condition that appears only in a denial ("denies chest pain") is listed under
+  *Mentioned only in denials* and is never shown as a diagnosis. Type 2 diabetes and prediabetes stay
+  separate rows that link to one conflict.
+- **Keyboard**: every panel is a labelled dialog. Focus moves into it, Tab stays inside, Esc closes,
+  and focus returns to the control that opened it. On narrow screens the sidebar becomes a drawer and
+  tables scroll inside their card.
 
 ## Replacing the demo records with the final synthetic dataset
 

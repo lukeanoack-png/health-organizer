@@ -12,17 +12,18 @@ import { demoRecordSet } from "./helpers";
 const EXPECTED = {
   documents: 9,
   unexplainedConflictTitles: [
-    "Lisinopril dose",
-    "Atorvastatin: listed as current and as discontinued",
-    "Penicillin allergy",
-    "Penicillin allergy: reaction differs",
-    "Atrial fibrillation: recorded vs. denied",
-    "Differing diagnoses: Type 2 diabetes mellitus vs. Prediabetes",
-    "LDL cholesterol on Jan 15, 2026: values differ",
-    "Transthoracic echocardiogram: dates differ",
-    "Date of birth differs between sources",
+    "Penicillin allergy: recorded vs NKDA",
+    "Sulfonamide antibiotics allergy: recorded vs NKDA",
+    "Penicillin reaction: hives vs anaphylaxis",
+    "Atrial fibrillation: recorded vs denied",
+    "Type 2 diabetes mellitus vs prediabetes",
+    "LDL cholesterol (Jan 15, 2026): 162 mg/dL vs 126 mg/dL",
+    "Transthoracic echocardiogram date: Mar 2 vs Mar 20",
+    "Date of birth: Jul 14, 1968 vs Apr 17, 1968",
   ],
-  documentedChangeTitles: ["Metoprolol succinate dose"],
+  // A documented change explains some of these records but not all of them.
+  partiallyExplainedTitles: ["Lisinopril: 10 mg vs 20 mg", "Atorvastatin: listed as current vs discontinued"],
+  documentedChangeTitles: ["Metoprolol succinate: 25 mg vs 50 mg"],
 };
 
 let cached: RecordSet | null = null;
@@ -43,6 +44,7 @@ test("demo dataset surfaces the planted conflicts", async () => {
   const rs = await rsP();
   const titles = (p: string) => rs.conflicts.filter((c) => c.pattern === p).map((c) => c.title);
   for (const t of EXPECTED.unexplainedConflictTitles) assert.ok(titles("unexplained").includes(t), `missing conflict: ${t}`);
+  assert.deepEqual(titles("partially_explained").sort(), [...EXPECTED.partiallyExplainedTitles].sort());
   assert.deepEqual(titles("documented_change"), EXPECTED.documentedChangeTitles);
   // Metformin is listed identically by six sources: corroboration, not conflict.
   assert.ok(!rs.conflicts.some((c) => c.subject === "metformin"));
@@ -86,7 +88,7 @@ test("Ask Records: answers cite valid sources", async () => {
 test("Ask Records: disagreements are stated, not resolved", async () => {
   const rs = await rsP();
   const a = ask(rs, "Are there conflicting medication doses?");
-  assert.ok(a.statements.some((s) => s.disagreement && /Lisinopril dose: 10 mg once daily .* vs\. 20 mg once daily/.test(s.text)));
+  assert.ok(a.statements.some((s) => s.disagreement && /^Lisinopril: 10 mg vs 20 mg\. 10 mg in .*; versus 20 mg in .*accounts for some of these records, but not all/.test(s.text)));
   assert.match(a.summary, /does not decide which is correct/);
   const meds = ask(rs, "What medications appear in these records?");
   const lis = meds.statements.find((s) => s.text.startsWith("Lisinopril"))!;

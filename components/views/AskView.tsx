@@ -1,78 +1,154 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ask, EXAMPLE_QUESTIONS, type Answer, type Citation } from "@/lib/query/ask";
 import { formatDate } from "@/lib/normalize/values";
 import { useRecords } from "../context";
-import { Badge, Card, PageHeader, TYPE_SHORT } from "../ui";
+import { SourceId, TYPE_SHORT, shortDate } from "../ui";
+import { IconArrowRight, IconInfo, IconSearch, IconUnresolved } from "../icons";
 
-function CitationChip({ c }: { c: Citation }) {
+const STARTERS = EXAMPLE_QUESTIONS.slice(0, 3);
+const MORE = [...EXAMPLE_QUESTIONS.slice(3), "Which documents mention apixaban?", "What procedures are recorded?", "Which providers appear in these records?"];
+
+/** Citations grouped per document, styled like every other source chip. */
+function Citations({ citations }: { citations: Citation[] }) {
   const { doc, letter, openEvidence } = useRecords();
-  const d = doc(c.documentId);
-  if (!d) return null;
+  const byDoc = new Map<string, Citation[]>();
+  for (const c of citations) byDoc.set(c.documentId, [...(byDoc.get(c.documentId) ?? []), c]);
+  const docs = [...byDoc].sort(([a], [b]) => letter(a).localeCompare(letter(b)));
   return (
-    <button
-      type="button"
-      onClick={() => openEvidence({ documentId: c.documentId, ranges: [{ start: c.start, end: c.end }], factIds: c.factId ? [c.factId] : [], heading: "Cited passage" })}
-      title={`“${d.text.slice(c.start, c.end).trim()}”`}
-      className="inline-flex items-center gap-1 rounded border border-line bg-white py-0.5 pl-0.5 pr-1.5 text-[11px] font-medium text-slate-700 hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
-    >
-      <span className="grid h-4 w-4 place-items-center rounded-sm bg-slate-700 font-mono text-[10px] font-bold text-white">{letter(d.id)}</span>
-      {TYPE_SHORT[d.meta.documentType]} · {formatDate(d.meta.recordDate).replace(/, \d{4}$/, "")}
-    </button>
+    <span className="inline-flex flex-wrap gap-1.5">
+      {docs.map(([id, cs]) => {
+        const d = doc(id);
+        if (!d) return null;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => openEvidence({ documentId: id, ranges: cs.map((c) => ({ start: c.start, end: c.end })), factIds: cs.flatMap((c) => (c.factId ? [c.factId] : [])), heading: "Cited in answer" })}
+            aria-label={`Source ${letter(id)}: ${TYPE_SHORT[d.meta.documentType]}, ${formatDate(d.meta.recordDate)}. Open cited passage${cs.length > 1 ? "s" : ""}.`}
+            title={cs.map((c) => `“${d.text.slice(c.start, c.end).trim()}”`).join("\n")}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-surface py-[3px] pl-[3px] pr-2 text-xs font-medium text-ink hover:border-ink/30 hover:bg-subtle"
+          >
+            <SourceId id={letter(id)} />
+            {TYPE_SHORT[d.meta.documentType]} <span className="text-muted">· {shortDate(d.meta.recordDate)}</span>
+            {cs.length > 1 && <span className="text-muted">×{cs.length}</span>}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
+const KIND_HEADING: Record<Answer["kind"], string> = {
+  answer: "What the records say",
+  insufficient: "No supporting evidence found",
+  out_of_scope: "Outside what this tool answers",
+};
+
+function AnswerBlock({ q, a }: { q: string; a: Answer }) {
+  const disagree = a.statements.some((s) => s.disagreement);
+  return (
+    <article className="card overflow-hidden">
+      <header className="border-b border-line px-5 py-3.5">
+        <p className="text-xs font-semibold text-muted">You asked</p>
+        <p className="mt-0.5 font-semibold text-ink">{q}</p>
+      </header>
+      <div className="px-5 py-4">
+        <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
+          {a.kind !== "answer" && <IconInfo size={16} />}
+          {KIND_HEADING[a.kind]}
+          {disagree && <span className="inline-flex items-center gap-1 text-xs font-semibold text-review"><IconUnresolved size={13} />Sources disagree</span>}
+        </h3>
+        <p className="mt-1.5 text-[15px] leading-relaxed text-ink">{a.summary}</p>
+        {a.kind === "insufficient" && <p className="mt-2 text-sm text-muted">Try naming a medication, condition, lab test or month — or browse the sections in the sidebar.</p>}
+        {a.statements.length > 0 && (
+          <ul className="mt-4 divide-y divide-line border-t border-line">
+            {a.statements.map((s, j) => (
+              <li key={j} className="py-3">
+                <p className="text-sm leading-relaxed text-ink">
+                  {s.disagreement && <span className="mr-1.5 font-semibold text-review">Conflicting claims:</span>}
+                  {s.text}
+                </p>
+                {s.citations.length > 0
+                  ? <div className="mt-2"><Citations citations={s.citations} /></div>
+                  : <p className="mt-1 text-xs text-muted">No supporting passage.</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </article>
   );
 }
 
 export function AskView() {
-  const { rs } = useRecords();
+  const { rs, busy } = useRecords();
   const [q, setQ] = useState("");
-  const [history, setHistory] = useState<{ q: string; a: Answer }[]>([]);
+  const [history, setHistory] = useState<{ q: string; a: Answer; n: number }[]>([]);
+  const input = useRef<HTMLInputElement>(null);
 
   const submit = (question: string) => {
-    if (!question.trim()) return;
-    setHistory((h) => [{ q: question, a: ask(rs, question) }, ...h]);
+    if (!question.trim() || busy) return;
+    setHistory((h) => [{ q: question, a: ask(rs, question), n: h.length }, ...h]);
     setQ("");
+    input.current?.focus();
   };
 
   return (
-    <>
-      <PageHeader
-        title="Ask Records"
-        subtitle="Ask organizational questions about what these synthetic documents say. Every answer cites its sources. This feature does not answer general medical questions, and gives no diagnosis or treatment advice."
-      />
-      <Card className="mb-5">
-        <form onSubmit={(e) => { e.preventDefault(); submit(q); }} className="flex gap-2">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Which documents mention hypertension?" className="flex-1 rounded-md border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
-          <button className="btn btn-primary" type="submit">Ask</button>
-        </form>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {EXAMPLE_QUESTIONS.map((e) => (
-            <button key={e} onClick={() => submit(e)} className="rounded-full border border-line bg-slate-50 px-2.5 py-1 text-xs text-slate-700 hover:border-accent/40 hover:text-accent">{e}</button>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-muted">Answers are assembled by rules from the extracted facts and document text — no AI model is used, and nothing leaves your browser.</p>
-      </Card>
+    <div className="mx-auto max-w-reading">
+      <header className="mb-6">
+        <h1 tabIndex={-1} className="text-3xl font-bold tracking-tight text-ink">Ask about your records</h1>
+        <p className="mt-2 text-base text-muted">Find what the documents say, with linked sources.</p>
+      </header>
 
-      <div className="space-y-4">
-        {history.map(({ q, a }, i) => (
-          <Card key={history.length - i} title={<span className="font-normal text-muted">Q: <span className="font-semibold text-ink">{q}</span></span>}
-            action={a.kind === "out_of_scope" ? <Badge tone="synth">Outside this tool’s scope</Badge> : a.kind === "insufficient" ? <Badge>Insufficient evidence</Badge> : a.statements.some((s) => s.disagreement) ? <Badge tone="review">Sources disagree</Badge> : <Badge tone="accent">Cited answer</Badge>}>
-            <p className="text-sm text-slate-800">{a.summary}</p>
-            {a.statements.length > 0 && (
-              <ul className="mt-3 space-y-2.5">
-                {a.statements.map((s, j) => (
-                  <li key={j} className={`rounded-md border px-3 py-2 ${s.disagreement ? "border-review-line bg-review-soft/50" : "border-line"}`}>
-                    <div className="text-sm text-ink">{s.disagreement && <span className="mr-1 font-semibold text-review">◆ Sources disagree.</span>}{s.text}</div>
-                    {s.citations.length > 0 ? (
-                      <div className="mt-1.5 flex flex-wrap gap-1">{s.citations.slice(0, 12).map((c, k) => <CitationChip key={k} c={c} />)}{s.citations.length > 12 && <span className="text-xs text-muted">+{s.citations.length - 12} more</span>}</div>
-                    ) : <div className="mt-1 text-xs text-muted">No supporting passage.</div>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        ))}
+      <form onSubmit={(e) => { e.preventDefault(); submit(q); }} className="card p-4" role="search">
+        <label htmlFor="ask-input" className="sr-only">Question about the loaded records</label>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"><IconSearch size={17} /></span>
+            <input id="ask-input" ref={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. When was atorvastatin first mentioned?" className="field py-2.5 pl-9 text-[15px]" />
+          </div>
+          <button className="btn btn-primary py-2.5" type="submit" disabled={busy || !q.trim()}>Ask <IconArrowRight size={16} /></button>
+        </div>
+        <div className="mt-3">
+          <p className="mb-1.5 text-xs font-semibold text-muted">Try</p>
+          <ul className="flex flex-col gap-1">
+            {STARTERS.map((e) => (
+              <li key={e}><button type="button" onClick={() => submit(e)} className="text-left text-sm font-medium text-brand hover:text-brand-hover hover:underline underline-offset-2">{e}</button></li>
+            ))}
+          </ul>
+          <details className="mt-2">
+            <summary className="cursor-pointer text-xs font-semibold text-muted hover:text-ink">More examples</summary>
+            <ul className="mt-1.5 flex flex-col gap-1">
+              {MORE.map((e) => (
+                <li key={e}><button type="button" onClick={() => submit(e)} className="text-left text-sm font-medium text-brand hover:text-brand-hover hover:underline underline-offset-2">{e}</button></li>
+              ))}
+            </ul>
+          </details>
+        </div>
+      </form>
+
+      <details className="mt-3 px-1 text-sm">
+        <summary className="cursor-pointer text-xs font-semibold text-muted hover:text-ink">How answers work</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
+          <li>Answers are assembled by fixed rules from the facts extracted from these documents and from the document text. No AI model is used.</li>
+          <li>Everything runs in your browser. Uploaded files are read locally and are not sent to a server; reloading the page clears them.</li>
+          <li>Every statement links to the passage it comes from. Where sources disagree, each version is shown — none is picked as correct.</li>
+          <li>Questions asking for diagnosis, treatment, dosing, risk or urgency are declined. Detection is rule-based, so unusual wording may be missed.</li>
+        </ul>
+      </details>
+
+      <div className="mt-6 space-y-4" aria-live="polite">
+        {busy && <p className="card px-5 py-4 text-sm text-muted">Processing documents… answers will include them when this finishes.</p>}
+        {!busy && history.length === 0 && (
+          <div className="rounded-xl border border-dashed border-line px-5 py-8 text-center">
+            <p className="font-semibold text-ink">No questions yet</p>
+            <p className="mt-1 text-sm text-muted">Answers quote the {rs.documents.length} loaded document{rs.documents.length === 1 ? "" : "s"} and link each statement to its source.</p>
+          </div>
+        )}
+        {history.map(({ q, a, n }) => <AnswerBlock key={n} q={q} a={a} />)}
       </div>
-    </>
+    </div>
   );
 }
